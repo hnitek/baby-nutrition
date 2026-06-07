@@ -528,7 +528,7 @@ export default function App() {
                 style={styles.textarea}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                placeholder='np. "owsianka ~100g z mlekiem i bananem, zjedzone w całości"'
+                placeholder='np. "owsianka z mlekiem i bananem, zjedzone prawie wszystko"'
                 onKeyDown={e => e.key === 'Enter' && e.ctrlKey && addMeal()}
               />
               <select style={styles.select} value={mealType} onChange={e => setMealType(e.target.value)}>

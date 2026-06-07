@@ -1,12 +1,10 @@
 const WORKER_URL = import.meta.env.VITE_WORKER_URL
-const API_SECRET = import.meta.env.VITE_API_SECRET
 
 async function callClaude(message, max_tokens = 1024) {
   const response = await fetch(WORKER_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Api-Secret': API_SECRET || '',
     },
     body: JSON.stringify({ message, max_tokens }),
   })

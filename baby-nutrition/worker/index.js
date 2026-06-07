@@ -1,26 +1,32 @@
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Api-Secret',
+const ALLOWED_ORIGIN = 'https://hnitek.github.io'
+
+function corsHeaders(origin) {
+  return {
+    'Access-Control-Allow-Origin': origin === ALLOWED_ORIGIN ? ALLOWED_ORIGIN : '',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin',
+  }
 }
 
 export default {
   async fetch(request, env) {
+    const origin = request.headers.get('Origin') || ''
+    const hdrs = corsHeaders(origin)
+
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: CORS_HEADERS })
+      return new Response(null, { status: 204, headers: hdrs })
+    }
+
+    if (origin !== ALLOWED_ORIGIN) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
 
     if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405, headers: CORS_HEADERS })
-    }
-
-    const secret = (request.headers.get('X-Api-Secret') || '').trim()
-    const apiSecret = (env.API_SECRET || '').trim()
-    if (apiSecret && secret !== apiSecret) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+      return new Response('Method not allowed', { status: 405, headers: hdrs })
     }
 
     let body
@@ -29,7 +35,7 @@ export default {
     } catch {
       return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
         status: 400,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        headers: { ...hdrs, 'Content-Type': 'application/json' },
       })
     }
 
@@ -38,7 +44,7 @@ export default {
     if (!message) {
       return new Response(JSON.stringify({ error: 'Missing message' }), {
         status: 400,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        headers: { ...hdrs, 'Content-Type': 'application/json' },
       })
     }
 
@@ -60,7 +66,7 @@ export default {
       const err = await anthropicResponse.text()
       return new Response(JSON.stringify({ error: err }), {
         status: anthropicResponse.status,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        headers: { ...hdrs, 'Content-Type': 'application/json' },
       })
     }
 
@@ -69,7 +75,7 @@ export default {
 
     return new Response(JSON.stringify({ text }), {
       status: 200,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      headers: { ...hdrs, 'Content-Type': 'application/json' },
     })
   },
 }
