@@ -1,25 +1,35 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState } from 'react'
 
 const CORRECT_PIN = import.meta.env.VITE_APP_PIN || '1234'
+
+const KEYS = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  [null, '0', '⌫'],
+]
 
 export default function PinGate({ onUnlock }) {
   const [pin, setPin] = useState('')
   const [shake, setShake] = useState(false)
   const [error, setError] = useState(false)
-  const inputRef = useRef(null)
   const pinLen = CORRECT_PIN.length
 
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
+  function press(key) {
+    if (shake) return
 
-  function handleChange(e) {
-    const val = e.target.value.replace(/\D/g, '').slice(0, pinLen)
-    setPin(val)
+    if (key === '⌫') {
+      setPin(p => p.slice(0, -1))
+      setError(false)
+      return
+    }
+
+    const next = (pin + key).slice(0, pinLen)
+    setPin(next)
     setError(false)
 
-    if (val.length === pinLen) {
-      if (val === CORRECT_PIN) {
+    if (next.length === pinLen) {
+      if (next === CORRECT_PIN) {
         setTimeout(onUnlock, 150)
       } else {
         setShake(true)
@@ -39,20 +49,8 @@ export default function PinGate({ onUnlock }) {
       justifyContent: 'center',
       fontFamily: "'Nunito', sans-serif",
       padding: '24px',
-    }}
-      onClick={() => inputRef.current?.focus()}
-    >
-      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <div style={{ fontSize: '52px', marginBottom: '10px' }}>🍼</div>
-        <div style={{
-          fontFamily: "'Playfair Display', serif",
-          fontSize: '22px', fontWeight: 700, color: '#92400e',
-        }}>Dzienniczek żywieniowy</div>
-        <div style={{ fontSize: '14px', color: '#a78060', marginTop: '6px' }}>
-          Wprowadź PIN
-        </div>
-      </div>
-
+      userSelect: 'none',
+    }}>
       <style>{`
         @keyframes shake {
           0%,100%{transform:translateX(0)}
@@ -61,74 +59,76 @@ export default function PinGate({ onUnlock }) {
           60%{transform:translateX(-7px)}
           80%{transform:translateX(7px)}
         }
+        .pin-key:active { transform: scale(0.92); background: #fed7aa !important; }
       `}</style>
 
+      <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+        <div style={{ fontSize: '52px', marginBottom: '10px' }}>🍼</div>
+        <div style={{
+          fontFamily: "'Playfair Display', serif",
+          fontSize: '22px', fontWeight: 700, color: '#92400e',
+        }}>Dzienniczek żywieniowy</div>
+      </div>
+
+      {/* Dots */}
       <div style={{
-        position: 'relative',
+        display: 'flex',
+        gap: '14px',
+        marginBottom: '10px',
         animation: shake ? 'shake 0.6s ease' : 'none',
       }}>
-        {/* Niewidoczny input — uruchamia klawiaturę systemową */}
-        <input
-          ref={inputRef}
-          type="tel"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          value={pin}
-          onChange={handleChange}
-          maxLength={pinLen}
-          autoComplete="off"
-          style={{
-            position: 'absolute',
-            opacity: 0,
-            width: '100%',
-            height: '100%',
-            top: 0,
-            left: 0,
-            cursor: 'default',
-            fontSize: '16px',
-          }}
-        />
-
-        {/* Kratki z cyferkami */}
-        <div style={{
-          display: 'flex',
-          gap: '12px',
-          cursor: 'text',
-        }}>
-          {Array.from({ length: pinLen }).map((_, i) => {
-            const filled = i < pin.length
-            const active = i === pin.length
-            return (
-              <div key={i} style={{
-                width: '52px',
-                height: '64px',
-                borderRadius: '14px',
-                border: `2px solid ${error ? '#ef4444' : active ? '#f97316' : filled ? '#fb923c' : '#fde68a'}`,
-                background: filled ? '#fff7ed' : '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '28px',
-                fontWeight: 800,
-                color: error ? '#ef4444' : '#92400e',
-                transition: 'border-color 0.15s, background 0.15s',
-                boxShadow: active ? '0 0 0 3px rgba(249,115,22,0.2)' : '0 2px 6px rgba(0,0,0,0.06)',
-              }}>
-                {filled ? '•' : ''}
-              </div>
-            )
-          })}
-        </div>
+        {Array.from({ length: pinLen }).map((_, i) => (
+          <div key={i} style={{
+            width: '16px',
+            height: '16px',
+            borderRadius: '50%',
+            background: error ? '#ef4444' : i < pin.length ? '#f97316' : '#fde68a',
+            transition: 'background 0.15s',
+            boxShadow: i < pin.length ? '0 0 0 3px rgba(249,115,22,0.2)' : 'none',
+          }} />
+        ))}
       </div>
 
       {error && (
-        <div style={{ marginTop: '16px', color: '#ef4444', fontSize: '14px', fontWeight: 600 }}>
+        <div style={{ color: '#ef4444', fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>
           Nieprawidłowy PIN
         </div>
       )}
+      {!error && <div style={{ height: '21px', marginBottom: '8px' }} />}
 
-      <div style={{ marginTop: '28px', color: '#c4a882', fontSize: '13px' }}>
-        Dotknij aby otworzyć klawiaturę
+      {/* Numpad */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+        {KEYS.map((row, ri) => (
+          <div key={ri} style={{ display: 'flex', gap: '10px' }}>
+            {row.map((key, ki) => (
+              <button
+                key={ki}
+                className="pin-key"
+                onClick={() => key && press(key)}
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  background: key ? '#fff' : 'transparent',
+                  boxShadow: key ? '0 2px 8px rgba(0,0,0,0.10)' : 'none',
+                  fontSize: key === '⌫' ? '22px' : '26px',
+                  fontWeight: 700,
+                  fontFamily: "'Nunito', sans-serif",
+                  color: '#92400e',
+                  cursor: key ? 'pointer' : 'default',
+                  transition: 'transform 0.1s, background 0.1s',
+                  WebkitTapHighlightColor: 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {key}
+              </button>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   )
