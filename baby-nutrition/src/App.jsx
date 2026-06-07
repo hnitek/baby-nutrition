@@ -8,16 +8,6 @@ const SUPABASE_ENABLED = !!(
 
 const MEAL_TYPES = ['Śniadanie', 'II Śniadanie', 'Obiad', 'Podwieczorek', 'Kolacja']
 
-const DAILY_NORMS = {
-  kalorie:     { label: 'Kalorie',      unit: 'kcal', max: 1150, color: '#f59e0b' },
-  bialko:      { label: 'Białko',       unit: 'g',    max: 15,   color: '#10b981' },
-  zelazo:      { label: 'Żelazo',       unit: 'mg',   max: 7,    color: '#ef4444' },
-  wapn:        { label: 'Wapń',         unit: 'mg',   max: 700,  color: '#3b82f6' },
-  witD:        { label: 'Wit. D',       unit: 'mcg',  max: 15,   color: '#8b5cf6' },
-  witC:        { label: 'Wit. C',       unit: 'mg',   max: 40,   color: '#f97316' },
-  cynk:        { label: 'Cynk',         unit: 'mg',   max: 3,    color: '#06b6d4' },
-}
-
 function todayKey() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -50,26 +40,55 @@ function rowsToData(rows) {
   return d
 }
 
-function ProgressBar({ label, unit, value, max, color }) {
-  const pct = Math.min(100, Math.round((value / max) * 100))
-  const over = value > max
+function NutrientsDisplay({ n }) {
+  if (!n) return <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af' }}>⏳ Analizowanie...</div>
+
+  // New qualitative format
+  if (n.ocena) {
+    return (
+      <div style={{ marginTop: '10px' }}>
+        <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.5, marginBottom: '6px' }}>
+          {n.ocena}
+        </div>
+        {n.skladniki?.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '4px' }}>
+            {n.skladniki.map((s, i) => (
+              <span key={i} style={{
+                background: '#f0fdf4', color: '#065f46',
+                borderRadius: '8px', padding: '2px 8px', fontSize: '12px', fontWeight: 600,
+              }}>✓ {s}</span>
+            ))}
+          </div>
+        )}
+        {n.wskazowka && (
+          <div style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic', marginTop: '4px' }}>
+            💡 {n.wskazowka}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Legacy numeric format (backward compat)
   return (
-    <div style={{ marginBottom: '10px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '3px', color: '#555' }}>
-        <span style={{ fontWeight: 600 }}>{label}</span>
-        <span style={{ color: over ? '#ef4444' : '#333' }}>
-          {value.toFixed(1)} / {max} {unit} {over ? '⚠️' : ''}
+    <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+      {[
+        { k: 'kalorie', l: 'kcal' },
+        { k: 'bialko', l: 'g białka' },
+        { k: 'zelazo', l: 'mg Fe' },
+        { k: 'wapn', l: 'mg Ca' },
+        { k: 'witD', l: 'mcg D' },
+      ].map(({ k, l }) => n[k] != null && (
+        <span key={k} style={{
+          background: '#f0fdf4', color: '#065f46',
+          borderRadius: '8px', padding: '2px 8px', fontSize: '12px', fontWeight: 600,
+        }}>{n[k]} {l}</span>
+      ))}
+      {n.uwagi && (
+        <span style={{ width: '100%', fontSize: '12px', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>
+          💡 {n.uwagi}
         </span>
-      </div>
-      <div style={{ background: '#e5e7eb', borderRadius: '99px', height: '10px', overflow: 'hidden' }}>
-        <div style={{
-          width: `${pct}%`,
-          height: '100%',
-          background: over ? '#ef4444' : color,
-          borderRadius: '99px',
-          transition: 'width 0.5s ease',
-        }} />
-      </div>
+      )}
     </div>
   )
 }
@@ -78,7 +97,6 @@ function MealCard({ meal, onDelete, onSave }) {
   const [editing, setEditing] = useState(false)
   const [editDesc, setEditDesc] = useState(meal.description)
   const [editType, setEditType] = useState(meal.type)
-  const n = meal.nutrients
 
   function startEdit() {
     setEditDesc(meal.description)
@@ -86,9 +104,7 @@ function MealCard({ meal, onDelete, onSave }) {
     setEditing(true)
   }
 
-  function cancelEdit() {
-    setEditing(false)
-  }
+  function cancelEdit() { setEditing(false) }
 
   function save() {
     if (!editDesc.trim()) return
@@ -186,33 +202,11 @@ function MealCard({ meal, onDelete, onSave }) {
             </div>
             <div style={{ display: 'flex', flexShrink: 0 }}>
               {iconBtn(startEdit, 'Edytuj posiłek', '✏️')}
-              {n && iconBtn(() => onSave(meal.description, meal.type), 'Przelicz ponownie', '🔄')}
+              {meal.nutrients && iconBtn(() => onSave(meal.description, meal.type), 'Przelicz ponownie', '🔄')}
               {iconBtn(onDelete, 'Usuń posiłek', '×')}
             </div>
           </div>
-          {n ? (
-            <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {[
-                { k: 'kalorie', l: 'kcal' },
-                { k: 'bialko', l: 'g białka' },
-                { k: 'zelazo', l: 'mg Fe' },
-                { k: 'wapn', l: 'mg Ca' },
-                { k: 'witD', l: 'mcg D' },
-              ].map(({ k, l }) => n[k] != null && (
-                <span key={k} style={{
-                  background: '#f0fdf4', color: '#065f46',
-                  borderRadius: '8px', padding: '2px 8px', fontSize: '12px', fontWeight: 600,
-                }}>{n[k]} {l}</span>
-              ))}
-              {n.uwagi && (
-                <span style={{ width: '100%', fontSize: '12px', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>
-                  💡 {n.uwagi}
-                </span>
-              )}
-            </div>
-          ) : (
-            <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af' }}>⏳ Analizowanie...</div>
-          )}
+          <NutrientsDisplay n={meal.nutrients} />
         </>
       )}
     </div>
@@ -225,13 +219,16 @@ export default function App() {
   const [description, setDescription] = useState('')
   const [mealType, setMealType] = useState('Śniadanie')
   const [loading, setLoading] = useState(false)
-  const [dayAssessment, setDayAssessment] = useState('')
-  const [weekAssessment, setWeekAssessment] = useState('')
   const [assessLoading, setAssessLoading] = useState(false)
   const [syncStatus, setSyncStatus] = useState('idle')
 
   const today = todayKey()
   const todayMeals = data[today]?.meals || []
+
+  const [dayAssessment, setDayAssessment] = useState(
+    () => localStorage.getItem(`baby-nutrition-day-${todayKey()}`) || ''
+  )
+  const [weekAssessment, setWeekAssessment] = useState('')
 
   useEffect(() => { saveStorage(data) }, [data])
 
@@ -253,17 +250,6 @@ export default function App() {
     window.addEventListener('focus', sync)
     return () => window.removeEventListener('focus', sync)
   }, [])
-
-  const totals = useCallback(() => {
-    const t = { kalorie: 0, bialko: 0, tluszcze: 0, weglowodany: 0,
-      zelazo: 0, wapn: 0, witD: 0, witC: 0, cynk: 0, blonnik: 0 }
-    todayMeals.forEach(m => {
-      if (m.nutrients) {
-        Object.keys(t).forEach(k => { t[k] += m.nutrients[k] ?? 0 })
-      }
-    })
-    return t
-  }, [todayMeals])
 
   function copyMeals() {
     const lines = todayMeals.map(m => `${m.type} (${m.time}): ${m.description}`).join('\n')
@@ -349,6 +335,7 @@ export default function App() {
     try {
       const text = await assessDay(todayMeals, today)
       setDayAssessment(text)
+      localStorage.setItem(`baby-nutrition-day-${today}`, text)
     } finally {
       setAssessLoading(false)
     }
@@ -367,8 +354,6 @@ export default function App() {
       setAssessLoading(false)
     }
   }
-
-  const t = totals()
 
   const styles = {
     root: {
@@ -543,16 +528,6 @@ export default function App() {
               </button>
             </div>
 
-            {todayMeals.length > 0 && (
-              <div style={styles.card}>
-                <div style={styles.sectionTitle}>Postęp dzienny</div>
-                {Object.entries(DAILY_NORMS).map(([key, cfg]) => (
-                  <ProgressBar key={key} label={cfg.label} unit={cfg.unit}
-                    value={t[key] ?? 0} max={cfg.max} color={cfg.color} />
-                ))}
-              </div>
-            )}
-
             <div style={styles.card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div style={{ ...styles.sectionTitle, marginBottom: 0 }}>Posiłki — {today}</div>
@@ -581,9 +556,9 @@ export default function App() {
               {todayMeals.length > 0 && (
                 <>
                   <button
-                    style={styles.btn('#059669', assessLoading || todayMeals.length === 0)}
+                    style={styles.btn('#059669', assessLoading)}
                     onClick={handleAssessDay}
-                    disabled={assessLoading || todayMeals.length === 0}
+                    disabled={assessLoading}
                   >
                     {assessLoading ? '⏳ Oceniam...' : '🩺 Oceń całodniową dietę'}
                   </button>
@@ -607,17 +582,15 @@ export default function App() {
                   .slice(0, 7)
                   .map(([date, val]) => {
                     const meals = val.meals || []
-                    const totalKcal = meals.reduce((s, m) => s + (m.nutrients?.kalorie ?? 0), 0)
-                    const totalFe = meals.reduce((s, m) => s + (m.nutrients?.zelazo ?? 0), 0)
                     return (
                       <div key={date} style={styles.historyDay}>
                         <div style={{ fontWeight: 700, color: '#92400e', marginBottom: '6px' }}>
                           📅 {date}
                         </div>
-                        <div style={{ fontSize: '13px', color: '#6b7280' }}>
-                          {meals.length} posiłków · {totalKcal.toFixed(0)} kcal · {totalFe.toFixed(1)} mg Fe
+                        <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>
+                          {meals.length} posiłków
                         </div>
-                        <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                           {meals.map(m => (
                             <span key={m.id} style={{
                               background: '#fff7ed', color: '#c2410c',

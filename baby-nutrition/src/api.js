@@ -3,9 +3,7 @@ const WORKER_URL = import.meta.env.VITE_WORKER_URL
 async function callClaude(message, max_tokens = 1024) {
   const response = await fetch(WORKER_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, max_tokens }),
   })
   if (!response.ok) {
@@ -16,26 +14,18 @@ async function callClaude(message, max_tokens = 1024) {
 }
 
 export async function analyzeMeal(description, mealType) {
-  const prompt = `Jesteś ekspertem ds. żywienia dzieci. Przeanalizuj posiłek dla 15-miesięcznego dziecka.
+  const prompt = `Jesteś dietetykiem dziecięcym. Oceń posiłek dla 15-miesięcznego dziecka, które nie pije już mleka modyfikowanego — wszystkie składniki odżywcze muszą pochodzić wyłącznie z jedzenia.
 
 Posiłek (${mealType}): "${description}"
 
-Zwróć TYLKO obiekt JSON (bez markdown, bez komentarzy) w tym formacie:
+Zwróć TYLKO obiekt JSON (bez markdown, bez komentarzy):
 {
-  "kalorie": <liczba kcal>,
-  "bialko": <gramy>,
-  "tluszcze": <gramy>,
-  "weglowodany": <gramy>,
-  "zelazo": <mg>,
-  "wapn": <mg>,
-  "witD": <mcg>,
-  "witC": <mg>,
-  "cynk": <mg>,
-  "blonnik": <gramy>,
-  "uwagi": "<krótka uwaga po polsku, max 100 znaków>"
+  "ocena": "<1-2 zdania ogólnej oceny wartości odżywczej posiłku po polsku>",
+  "skladniki": ["<lista wykrytych kluczowych składników, np. żelazo, witamina C, białko, wapń, witamina D, cynk, omega-3, błonnik — tylko te które faktycznie są w posiłku>"],
+  "wskazowka": "<krótka wskazówka uzupełnienia lub null jeśli posiłek kompletny, max 90 znaków>"
 }`
 
-  const text = await callClaude(prompt, 512)
+  const text = await callClaude(prompt, 400)
   try {
     const cleaned = text.replace(/```json\n?|\n?```/g, '').trim()
     return JSON.parse(cleaned)
@@ -46,40 +36,32 @@ Zwróć TYLKO obiekt JSON (bez markdown, bez komentarzy) w tym formacie:
 
 export async function assessDay(meals, date) {
   const mealsText = meals
-    .map(m => `- ${m.type}: ${m.description} (${m.nutrients?.kalorie ?? '?'} kcal)`)
+    .map(m => `- ${m.type}: ${m.description}`)
     .join('\n')
 
-  const prompt = `Jesteś ekspertem ds. żywienia dzieci. Oceń całodniową dietę 15-miesięcznego dziecka (${date}).
+  const prompt = `Jesteś dietetykiem dziecięcym. Oceń całodniową dietę 15-miesięcznego dziecka, które nie pije mleka modyfikowanego — wszystkie składniki odżywcze muszą pochodzić z posiłków (${date}).
 
 Posiłki:
 ${mealsText}
 
-Normy dzienne dla 15-miesiecznika:
-- Kalorie: 1000-1300 kcal
-- Białko: 13-16 g
-- Żelazo: 7 mg
-- Wapń: 700 mg
-- Witamina D: 15 mcg
+Kluczowe składniki do oceny: żelazo, wapń, witamina D, witamina C, cynk, białko, kwasy omega-3, błonnik.
 
-Napisz po polsku ocenę diety w 3-5 zdaniach. Wskaż co było dobre, czego brakowało i jak to poprawić. Bądź ciepły i pomocny jak przyjazny pediatra.`
+Napisz po polsku ocenę w 4-5 zdaniach: które składniki były dobrze pokryte, czego wyraźnie brakowało, i jedną konkretną wskazówkę na jutro. Bądź ciepły i pomocny jak przyjazny pediatra.`
 
   return await callClaude(prompt, 600)
 }
 
 export async function assessWeek(days) {
   const daysText = days
-    .map(d => {
-      const total = d.meals.reduce((s, m) => s + (m.nutrients?.kalorie ?? 0), 0)
-      return `- ${d.date}: ${d.meals.length} posiłków, ~${total} kcal`
-    })
+    .map(d => `- ${d.date}: ${d.meals.length} posiłków — ${d.meals.map(m => m.description).join(', ')}`)
     .join('\n')
 
-  const prompt = `Jesteś ekspertem ds. żywienia dzieci. Oceń tygodniową dietę 15-miesięcznego dziecka.
+  const prompt = `Jesteś dietetykiem dziecięcym. Oceń tygodniową dietę 15-miesięcznego dziecka, które nie pije mleka modyfikowanego.
 
-Podsumowanie tygodnia:
+Posiłki tygodnia:
 ${daysText}
 
-Napisz po polsku podsumowanie tygodniowe w 4-6 zdaniach. Oceń regularność posiłków, kaloryczność, różnorodność. Daj 2-3 konkretne wskazówki na następny tydzień. Bądź motywujący dla rodzica.`
+Napisz po polsku podsumowanie w 4-6 zdaniach: oceń różnorodność i regularność, wskaż które składniki (żelazo, wapń, wit. D, wit. C, białko) były dobrze reprezentowane a których brakowało. Daj 2-3 konkretne wskazówki na następny tydzień. Bądź motywujący dla rodzica.`
 
   return await callClaude(prompt, 800)
 }
