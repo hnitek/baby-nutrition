@@ -53,57 +53,146 @@ function ProgressBar({ label, unit, value, max, color }) {
   )
 }
 
-function MealCard({ meal, onDelete }) {
+function MealCard({ meal, onDelete, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [editDesc, setEditDesc] = useState(meal.description)
+  const [editType, setEditType] = useState(meal.type)
   const n = meal.nutrients
+
+  function startEdit() {
+    setEditDesc(meal.description)
+    setEditType(meal.type)
+    setEditing(true)
+  }
+
+  function cancelEdit() {
+    setEditing(false)
+  }
+
+  function save() {
+    if (!editDesc.trim()) return
+    onSave(editDesc.trim(), editType)
+    setEditing(false)
+  }
+
+  const iconBtn = (onClick, title, children) => (
+    <button onClick={onClick} title={title} style={{
+      background: 'none', border: 'none', cursor: 'pointer',
+      color: '#9ca3af', fontSize: '16px', lineHeight: 1, padding: '0 3px',
+      transition: 'color 0.15s',
+    }}
+      onMouseEnter={e => e.currentTarget.style.color = '#6b7280'}
+      onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}
+    >{children}</button>
+  )
+
   return (
     <div style={{
-      background: '#fffbf5',
-      border: '1px solid #fde68a',
+      background: editing ? '#fff7ed' : '#fffbf5',
+      border: `1px solid ${editing ? '#fb923c' : '#fde68a'}`,
       borderRadius: '14px',
       padding: '14px 16px',
       marginBottom: '10px',
       boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+      transition: 'border-color 0.2s, background 0.2s',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <span style={{
-            background: '#fef3c7',
-            color: '#92400e',
-            borderRadius: '8px',
-            padding: '2px 8px',
-            fontSize: '12px',
-            fontWeight: 700,
-            marginRight: '8px',
-          }}>{meal.type}</span>
-          <span style={{ fontSize: '14px', color: '#374151', fontWeight: 600 }}>{meal.description}</span>
-        </div>
-        <button onClick={onDelete} style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          color: '#9ca3af', fontSize: '18px', lineHeight: 1, padding: '0 4px',
-        }}>×</button>
-      </div>
-      {n ? (
-        <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-          {[
-            { k: 'kalorie', l: 'kcal' },
-            { k: 'bialko', l: 'g białka' },
-            { k: 'zelazo', l: 'mg Fe' },
-            { k: 'wapn', l: 'mg Ca' },
-            { k: 'witD', l: 'mcg D' },
-          ].map(({ k, l }) => n[k] != null && (
-            <span key={k} style={{
-              background: '#f0fdf4', color: '#065f46',
-              borderRadius: '8px', padding: '2px 8px', fontSize: '12px', fontWeight: 600,
-            }}>{n[k]} {l}</span>
-          ))}
-          {n.uwagi && (
-            <span style={{ width: '100%', fontSize: '12px', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>
-              💡 {n.uwagi}
-            </span>
-          )}
-        </div>
+      {editing ? (
+        <>
+          <textarea
+            autoFocus
+            value={editDesc}
+            onChange={e => setEditDesc(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) save() }}
+            style={{
+              width: '100%', minHeight: '70px',
+              border: '2px solid #fb923c', borderRadius: '10px',
+              padding: '10px', fontSize: '14px',
+              fontFamily: "'Nunito', sans-serif",
+              outline: 'none', resize: 'vertical',
+              boxSizing: 'border-box', background: '#fff',
+            }}
+          />
+          <select
+            value={editType}
+            onChange={e => setEditType(e.target.value)}
+            style={{
+              width: '100%', marginTop: '8px',
+              border: '2px solid #fb923c', borderRadius: '10px',
+              padding: '8px 10px', fontSize: '14px',
+              fontFamily: "'Nunito', sans-serif",
+              background: '#fff', outline: 'none',
+              boxSizing: 'border-box', cursor: 'pointer',
+            }}
+          >
+            {MEAL_TYPES.map(t => <option key={t}>{t}</option>)}
+          </select>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+            <button
+              onClick={save}
+              disabled={!editDesc.trim()}
+              style={{
+                flex: 1, padding: '9px', border: 'none', borderRadius: '10px',
+                background: editDesc.trim() ? 'linear-gradient(135deg,#f97316,#fb923c)' : '#e5e7eb',
+                color: editDesc.trim() ? '#fff' : '#9ca3af',
+                fontWeight: 800, fontSize: '14px',
+                fontFamily: "'Nunito', sans-serif", cursor: editDesc.trim() ? 'pointer' : 'not-allowed',
+              }}
+            >
+              💾 Zapisz i przelicz
+            </button>
+            <button
+              onClick={cancelEdit}
+              style={{
+                padding: '9px 14px', border: '2px solid #e5e7eb', borderRadius: '10px',
+                background: '#fff', color: '#6b7280', fontWeight: 700, fontSize: '14px',
+                fontFamily: "'Nunito', sans-serif", cursor: 'pointer',
+              }}
+            >
+              Anuluj
+            </button>
+          </div>
+        </>
       ) : (
-        <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af' }}>⏳ Analizowanie...</div>
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 0, marginRight: '8px' }}>
+              <span style={{
+                background: '#fef3c7', color: '#92400e',
+                borderRadius: '8px', padding: '2px 8px',
+                fontSize: '12px', fontWeight: 700, marginRight: '8px',
+              }}>{meal.type}</span>
+              <span style={{ fontSize: '14px', color: '#374151', fontWeight: 600 }}>{meal.description}</span>
+            </div>
+            <div style={{ display: 'flex', flexShrink: 0 }}>
+              {iconBtn(startEdit, 'Edytuj posiłek', '✏️')}
+              {n && iconBtn(() => onSave(meal.description, meal.type), 'Przelicz ponownie', '🔄')}
+              {iconBtn(onDelete, 'Usuń posiłek', '×')}
+            </div>
+          </div>
+          {n ? (
+            <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {[
+                { k: 'kalorie', l: 'kcal' },
+                { k: 'bialko', l: 'g białka' },
+                { k: 'zelazo', l: 'mg Fe' },
+                { k: 'wapn', l: 'mg Ca' },
+                { k: 'witD', l: 'mcg D' },
+              ].map(({ k, l }) => n[k] != null && (
+                <span key={k} style={{
+                  background: '#f0fdf4', color: '#065f46',
+                  borderRadius: '8px', padding: '2px 8px', fontSize: '12px', fontWeight: 600,
+                }}>{n[k]} {l}</span>
+              ))}
+              {n.uwagi && (
+                <span style={{ width: '100%', fontSize: '12px', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>
+                  💡 {n.uwagi}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af' }}>⏳ Analizowanie...</div>
+          )}
+        </>
       )}
     </div>
   )
@@ -170,6 +259,30 @@ export default function App() {
       ...prev,
       [today]: { meals: (prev[today]?.meals || []).filter(m => m.id !== id) },
     }))
+  }
+
+  async function updateMeal(dateKey, id, newDescription, newType) {
+    setData(prev => ({
+      ...prev,
+      [dateKey]: {
+        meals: (prev[dateKey]?.meals || []).map(m =>
+          m.id === id ? { ...m, description: newDescription, type: newType, nutrients: null } : m
+        ),
+      },
+    }))
+    try {
+      const nutrients = await analyzeMeal(newDescription, newType)
+      setData(prev => ({
+        ...prev,
+        [dateKey]: {
+          meals: (prev[dateKey]?.meals || []).map(m =>
+            m.id === id ? { ...m, nutrients } : m
+          ),
+        },
+      }))
+    } catch {
+      // nutrients stays null — spinner shows
+    }
   }
 
   async function handleAssessDay() {
@@ -385,7 +498,12 @@ export default function App() {
                 </div>
               ) : (
                 todayMeals.map(meal => (
-                  <MealCard key={meal.id} meal={meal} onDelete={() => deleteMeal(meal.id)} />
+                  <MealCard
+                    key={meal.id}
+                    meal={meal}
+                    onDelete={() => deleteMeal(meal.id)}
+                    onSave={(desc, type) => updateMeal(today, meal.id, desc, type)}
+                  />
                 ))
               )}
               {todayMeals.length > 0 && (
@@ -466,12 +584,15 @@ export default function App() {
                       📅 {date}
                     </div>
                     {(val.meals || []).map(meal => (
-                      <MealCard key={meal.id} meal={meal} onDelete={() => {
-                        setData(prev => ({
+                      <MealCard
+                        key={meal.id}
+                        meal={meal}
+                        onDelete={() => setData(prev => ({
                           ...prev,
                           [date]: { meals: (prev[date]?.meals || []).filter(m => m.id !== meal.id) },
-                        }))
-                      }} />
+                        }))}
+                        onSave={(desc, type) => updateMeal(date, meal.id, desc, type)}
+                      />
                     ))}
                     {(val.meals || []).length === 0 && (
                       <div style={{ color: '#9ca3af', fontSize: '13px' }}>Brak posiłków</div>
