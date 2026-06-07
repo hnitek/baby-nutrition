@@ -23,5 +23,7 @@ jobs:
           workingDirectory: baby-nutrition/worker
           secrets: |
             ANTHROPIC_API_KEY
+            API_SECRET
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          API_SECRET: ${{ secrets.VITE_API_SECRET }}
