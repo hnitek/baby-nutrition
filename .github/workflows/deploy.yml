@@ -36,6 +36,8 @@ jobs:
           VITE_WORKER_URL: ${{ secrets.VITE_WORKER_URL }}
           VITE_APP_PIN: ${{ secrets.VITE_APP_PIN }}
           VITE_API_SECRET: ${{ secrets.VITE_API_SECRET }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
 
       - name: Deploy to gh-pages branch

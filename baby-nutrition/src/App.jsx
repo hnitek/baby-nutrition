@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { analyzeMeal, assessDay, assessWeek } from './api.js'
+import { fetchAllMeals, dbInsert, dbUpdate, dbDelete } from './db.js'
+
+const SUPABASE_ENABLED = !!(
+  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
+)
 
 const MEAL_TYPES = ['Śniadanie', 'II Śniadanie', 'Obiad', 'Podwieczorek', 'Kolacja']
 
@@ -27,6 +32,22 @@ function loadStorage() {
 
 function saveStorage(data) {
   localStorage.setItem('baby-nutrition-data', JSON.stringify(data))
+}
+
+function rowsToData(rows) {
+  const d = {}
+  rows.forEach(row => {
+    if (!d[row.date]) d[row.date] = { meals: [] }
+    d[row.date].meals.push({
+      id: row.id,
+      type: row.meal_type,
+      description: row.description,
+      time: row.meal_time,
+      nutrients: row.nutrients,
+    })
+  })
+  Object.values(d).forEach(day => day.meals.sort((a, b) => a.id - b.id))
+  return d
 }
 
 function ProgressBar({ label, unit, value, max, color }) {
@@ -207,11 +228,31 @@ export default function App() {
   const [dayAssessment, setDayAssessment] = useState('')
   const [weekAssessment, setWeekAssessment] = useState('')
   const [assessLoading, setAssessLoading] = useState(false)
+  const [syncStatus, setSyncStatus] = useState('idle')
 
   const today = todayKey()
   const todayMeals = data[today]?.meals || []
 
   useEffect(() => { saveStorage(data) }, [data])
+
+  useEffect(() => {
+    async function sync() {
+      if (!SUPABASE_ENABLED) return
+      setSyncStatus('syncing')
+      try {
+        const rows = await fetchAllMeals()
+        const remote = rowsToData(rows)
+        setData(remote)
+        saveStorage(remote)
+        setSyncStatus('idle')
+      } catch {
+        setSyncStatus('error')
+      }
+    }
+    sync()
+    window.addEventListener('focus', sync)
+    return () => window.removeEventListener('focus', sync)
+  }, [])
 
   const totals = useCallback(() => {
     const t = { kalorie: 0, bialko: 0, tluszcze: 0, weglowodany: 0,
@@ -239,6 +280,9 @@ export default function App() {
     }))
     setDescription('')
     setLoading(true)
+    if (SUPABASE_ENABLED) {
+      try { await dbInsert(meal, today) } catch {}
+    }
     try {
       const nutrients = await analyzeMeal(meal.description, meal.type)
       setData(prev => ({
@@ -249,16 +293,22 @@ export default function App() {
           ),
         },
       }))
+      if (SUPABASE_ENABLED) {
+        try { await dbUpdate(meal.id, { nutrients }) } catch {}
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  function deleteMeal(id) {
+  function deleteMeal(dateKey, id) {
     setData(prev => ({
       ...prev,
-      [today]: { meals: (prev[today]?.meals || []).filter(m => m.id !== id) },
+      [dateKey]: { meals: (prev[dateKey]?.meals || []).filter(m => m.id !== id) },
     }))
+    if (SUPABASE_ENABLED) {
+      dbDelete(id).catch(() => {})
+    }
   }
 
   async function updateMeal(dateKey, id, newDescription, newType) {
@@ -270,6 +320,9 @@ export default function App() {
         ),
       },
     }))
+    if (SUPABASE_ENABLED) {
+      try { await dbUpdate(id, { description: newDescription, meal_type: newType, nutrients: null }) } catch {}
+    }
     try {
       const nutrients = await analyzeMeal(newDescription, newType)
       setData(prev => ({
@@ -280,9 +333,10 @@ export default function App() {
           ),
         },
       }))
-    } catch {
-      // nutrients stays null — spinner shows
-    }
+      if (SUPABASE_ENABLED) {
+        try { await dbUpdate(id, { nutrients }) } catch {}
+      }
+    } catch {}
   }
 
   async function handleAssessDay() {
@@ -444,7 +498,11 @@ export default function App() {
     <div style={styles.root}>
       <div style={styles.header}>
         <h1 style={styles.h1}>🍼 Dzienniczek żywieniowy</h1>
-        <div style={styles.subtitle}>dla 15-miesięcznej córeczki</div>
+        <div style={styles.subtitle}>
+          dla 15-miesięcznej córeczki
+          {SUPABASE_ENABLED && syncStatus === 'syncing' && <span style={{ opacity: 0.7 }}> · synchronizuje…</span>}
+          {SUPABASE_ENABLED && syncStatus === 'error' && <span> · ⚠️ offline</span>}
+        </div>
       </div>
 
       <div style={styles.tabs}>
@@ -501,7 +559,7 @@ export default function App() {
                   <MealCard
                     key={meal.id}
                     meal={meal}
-                    onDelete={() => deleteMeal(meal.id)}
+                    onDelete={() => deleteMeal(today, meal.id)}
                     onSave={(desc, type) => updateMeal(today, meal.id, desc, type)}
                   />
                 ))
@@ -587,10 +645,7 @@ export default function App() {
                       <MealCard
                         key={meal.id}
                         meal={meal}
-                        onDelete={() => setData(prev => ({
-                          ...prev,
-                          [date]: { meals: (prev[date]?.meals || []).filter(m => m.id !== meal.id) },
-                        }))}
+                        onDelete={() => deleteMeal(date, meal.id)}
                         onSave={(desc, type) => updateMeal(date, meal.id, desc, type)}
                       />
                     ))}
