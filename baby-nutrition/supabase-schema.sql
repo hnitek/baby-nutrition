@@ -14,3 +14,16 @@ create policy "Public access"
   on meals for all
   using (true)
   with check (true);
+
+create table if not exists assessments (
+  key text primary key,
+  content text not null,
+  updated_at timestamptz default now()
+);
+
+alter table assessments enable row level security;
+
+create policy "Public access"
+  on assessments for all
+  using (true)
+  with check (true);

@@ -35,3 +35,20 @@ export async function dbDelete(id) {
   const { error } = await supabase.from('meals').delete().eq('id', id)
   if (error) throw error
 }
+
+export async function fetchAssessment(key) {
+  const { data, error } = await supabase
+    .from('assessments')
+    .select('content')
+    .eq('key', key)
+    .maybeSingle()
+  if (error) throw error
+  return data?.content ?? ''
+}
+
+export async function saveAssessment(key, content) {
+  const { error } = await supabase
+    .from('assessments')
+    .upsert({ key, content, updated_at: new Date().toISOString() })
+  if (error) throw error
+}
