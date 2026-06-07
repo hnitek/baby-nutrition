@@ -265,7 +265,7 @@ export default function App() {
   }, [])
 
   function copyMeals() {
-    const lines = todayMeals.map(m => `${m.type} (${m.time}): ${m.description}`).join('\n')
+    const lines = todayMeals.map(m => `${m.type}: ${m.description}`).join('\n')
     navigator.clipboard?.writeText(lines)
   }
 
