@@ -22,7 +22,7 @@ Posiłek (${mealType}): "${description}"
 Zwróć TYLKO obiekt JSON (bez markdown, bez komentarzy):
 {
   "ocena": "<1-2 zdania — zacznij od pozytywów, ton spokojny i motywujący, bez alarmowania, po polsku>",
-  "skladniki": ["<wykryte wartościowe składniki, np. żelazo, witamina C, białko, wapń, witamina D, cynk, omega-3, błonnik — uwzględnij kontekst, tylko te realnie obecne>"],
+  "skladniki": ["<TYLKO nazwy składników odżywczych realnie obecnych w posiłku, np.: białko, żelazo, wapń, witamina C, witamina D, cynk, kwasy omega-3, błonnik — nie wpisuj nazw produktów ani ilości, uwzględnij kontekst>"],
   "wskazowka": "<krótka pozytywna sugestia co można dodać przy kolejnym posiłku, lub null, max 90 znaków>"
 }`
 

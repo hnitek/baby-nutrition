@@ -249,6 +249,11 @@ export default function App() {
   const [context, setContext] = useState('')
   const [contextInput, setContextInput] = useState('')
   const [contextSaving, setContextSaving] = useState(false)
+  const [viewDate, setViewDate] = useState(today)
+  const [viewAssessment, setViewAssessment] = useState('')
+
+  const isToday = viewDate === today
+  const viewMeals = data[viewDate]?.meals || []
 
   useEffect(() => { saveStorage(data) }, [data])
 
@@ -282,8 +287,35 @@ export default function App() {
     return () => window.removeEventListener('focus', sync)
   }, [])
 
+  useEffect(() => {
+    if (!SUPABASE_ENABLED || viewDate === today) return
+    setViewAssessment('')
+    fetchAssessment(`day-${viewDate}`).then(text => setViewAssessment(text)).catch(() => {})
+  }, [viewDate])
+
+  function formatViewDate(d) {
+    if (d === today) return 'Dziś'
+    const yest = new Date(today)
+    yest.setDate(yest.getDate() - 1)
+    if (d === yest.toISOString().slice(0, 10)) return 'Wczoraj'
+    return d
+  }
+
+  function prevDay() {
+    const d = new Date(viewDate)
+    d.setDate(d.getDate() - 1)
+    setViewDate(d.toISOString().slice(0, 10))
+  }
+
+  function nextDay() {
+    if (viewDate >= today) return
+    const d = new Date(viewDate)
+    d.setDate(d.getDate() + 1)
+    setViewDate(d.toISOString().slice(0, 10))
+  }
+
   function copyMeals() {
-    const lines = todayMeals.map(m => `${m.type}: ${m.description}`).join('\n')
+    const lines = viewMeals.map(m => `${m.type}: ${m.description}`).join('\n')
     navigator.clipboard?.writeText(lines)
   }
 
@@ -364,11 +396,15 @@ export default function App() {
   async function handleAssessDay() {
     setAssessLoading(true)
     try {
-      const text = await assessDay(todayMeals, today, context)
-      setDayAssessment(text)
-      if (SUPABASE_ENABLED) {
-        saveAssessment(`day-${today}`, text).catch(() => {})
+      const text = await assessDay(viewMeals, viewDate, context)
+      if (isToday) {
+        setDayAssessment(text)
       } else {
+        setViewAssessment(text)
+      }
+      if (SUPABASE_ENABLED) {
+        saveAssessment(`day-${viewDate}`, text).catch(() => {})
+      } else if (isToday) {
         localStorage.setItem(`baby-nutrition-day-${today}`, text)
       }
     } finally {
@@ -555,55 +591,71 @@ export default function App() {
         {/* ─── TAB: DZIŚ ─── */}
         {tab === 'today' && (
           <>
-            <div style={styles.card}>
-              <div style={styles.sectionTitle}>Dodaj posiłek</div>
-              <label style={styles.label}>Opis posiłku</label>
-              <textarea
-                style={styles.textarea}
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
-                placeholder='np. "owsianka z mlekiem i bananem, zjedzone prawie wszystko"'
-                onKeyDown={e => e.key === 'Enter' && e.ctrlKey && addMeal()}
-              />
-              <select style={styles.select} value={mealType} onChange={e => setMealType(e.target.value)}>
-                {MEAL_TYPES.map(t => <option key={t}>{t}</option>)}
-              </select>
-              <button
-                style={styles.btn('#f97316', loading || !description.trim())}
-                onClick={addMeal}
-                disabled={loading || !description.trim()}
-              >
-                {loading ? '⏳ Analizuję...' : '+ Dodaj i analizuj'}
-              </button>
-            </div>
+            {isToday && (
+              <div style={styles.card}>
+                <div style={styles.sectionTitle}>Dodaj posiłek</div>
+                <label style={styles.label}>Opis posiłku</label>
+                <textarea
+                  style={styles.textarea}
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
+                  placeholder='np. "owsianka z mlekiem i bananem, zjedzone prawie wszystko"'
+                  onKeyDown={e => e.key === 'Enter' && e.ctrlKey && addMeal()}
+                />
+                <select style={styles.select} value={mealType} onChange={e => setMealType(e.target.value)}>
+                  {MEAL_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+                <button
+                  style={styles.btn('#f97316', loading || !description.trim())}
+                  onClick={addMeal}
+                  disabled={loading || !description.trim()}
+                >
+                  {loading ? '⏳ Analizuję...' : '+ Dodaj i analizuj'}
+                </button>
+              </div>
+            )}
 
             <div style={styles.card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <div style={{ ...styles.sectionTitle, marginBottom: 0 }}>Posiłki — {today}</div>
-                {todayMeals.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                <button onClick={prevDay} style={{
+                  background: 'none', border: '1.5px solid #fed7aa', borderRadius: '10px',
+                  padding: '5px 12px', fontSize: '18px', color: '#c2410c', cursor: 'pointer',
+                  fontFamily: "'Nunito', sans-serif", lineHeight: 1, flexShrink: 0,
+                }}>←</button>
+                <div style={{ ...styles.sectionTitle, marginBottom: 0, flex: 1, textAlign: 'center' }}>
+                  {formatViewDate(viewDate)}
+                </div>
+                <button onClick={nextDay} disabled={viewDate >= today} style={{
+                  background: 'none', border: '1.5px solid #fed7aa', borderRadius: '10px',
+                  padding: '5px 12px', fontSize: '18px', color: '#c2410c',
+                  cursor: viewDate >= today ? 'default' : 'pointer',
+                  fontFamily: "'Nunito', sans-serif", lineHeight: 1, flexShrink: 0,
+                  opacity: viewDate >= today ? 0.25 : 1,
+                }}>→</button>
+                {viewMeals.length > 0 && (
                   <button onClick={copyMeals} style={{
                     background: 'none', border: '1.5px solid #fed7aa', borderRadius: '10px',
                     padding: '5px 10px', fontSize: '13px', fontWeight: 700,
-                    color: '#c2410c', cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
-                  }}>📋 Kopiuj</button>
+                    color: '#c2410c', cursor: 'pointer', fontFamily: "'Nunito', sans-serif", flexShrink: 0,
+                  }}>📋</button>
                 )}
               </div>
-              {todayMeals.length === 0 ? (
+              {viewMeals.length === 0 ? (
                 <div style={styles.emptyState}>
-                  🌱 Brak posiłków. Dodaj pierwszy posiłek córeczki!
+                  {isToday ? '🌱 Brak posiłków. Dodaj pierwszy posiłek córeczki!' : '📭 Brak posiłków w tym dniu.'}
                 </div>
               ) : (
-                todayMeals.map(meal => (
+                viewMeals.map(meal => (
                   <MealCard
                     key={meal.id}
                     meal={meal}
-                    onDelete={() => deleteMeal(today, meal.id)}
-                    onSave={(desc, type) => updateMeal(today, meal.id, desc, type)}
+                    onDelete={() => deleteMeal(viewDate, meal.id)}
+                    onSave={(desc, type) => updateMeal(viewDate, meal.id, desc, type)}
                   />
                 ))
               )}
-              {todayMeals.length > 0 && (
+              {viewMeals.length > 0 && (
                 <>
                   <button
                     style={styles.btn('#059669', assessLoading)}
@@ -612,7 +664,9 @@ export default function App() {
                   >
                     {assessLoading ? '⏳ Oceniam...' : '🩺 Oceń całodniową dietę'}
                   </button>
-                  {dayAssessment && <div style={styles.assessBox}>{stripMarkdown(dayAssessment)}</div>}
+                  {(isToday ? dayAssessment : viewAssessment) && (
+                    <div style={styles.assessBox}>{stripMarkdown(isToday ? dayAssessment : viewAssessment)}</div>
+                  )}
                 </>
               )}
             </div>
