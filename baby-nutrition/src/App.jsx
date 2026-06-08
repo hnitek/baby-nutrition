@@ -687,9 +687,22 @@ export default function App() {
                   .map(([date, val]) => {
                     const meals = val.meals || []
                     return (
-                      <div key={date} style={styles.historyDay}>
-                        <div style={{ fontWeight: 700, color: '#92400e', marginBottom: '6px' }}>
-                          📅 {date}
+                      <div
+                        key={date}
+                        onClick={() => { setViewDate(date); setTab('today') }}
+                        style={{
+                          ...styles.historyDay,
+                          cursor: 'pointer',
+                          transition: 'background 0.15s, box-shadow 0.15s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#fff7ed'; e.currentTarget.style.boxShadow = '0 2px 10px rgba(249,115,22,0.12)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 1px 6px rgba(0,0,0,0.05)' }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <div style={{ fontWeight: 700, color: '#92400e' }}>
+                            📅 {date === today ? 'Dziś' : date}
+                          </div>
+                          <span style={{ fontSize: '12px', color: '#f97316', fontWeight: 700 }}>→</span>
                         </div>
                         <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>
                           {meals.length} posiłków
