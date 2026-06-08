@@ -418,11 +418,10 @@ export default function App() {
       textAlign: 'center',
     },
     h1: {
-      fontFamily: "'Playfair Display', serif",
-      fontSize: '26px',
-      fontWeight: 700,
+      fontSize: '24px',
+      fontWeight: 800,
       margin: 0,
-      letterSpacing: '-0.5px',
+      letterSpacing: '-0.3px',
     },
     subtitle: { fontSize: '14px', opacity: 0.85, marginTop: '4px' },
     tabs: {
@@ -459,14 +458,15 @@ export default function App() {
     label: { display: 'block', fontWeight: 700, color: '#374151', marginBottom: '8px', fontSize: '14px' },
     textarea: {
       width: '100%',
-      minHeight: '80px',
+      minHeight: '100px',
       border: '2px solid #fde68a',
       borderRadius: '12px',
       padding: '12px',
       fontSize: '15px',
       fontFamily: "'Nunito', sans-serif",
       outline: 'none',
-      resize: 'vertical',
+      resize: 'none',
+      overflow: 'hidden',
       boxSizing: 'border-box',
       background: '#fffbf5',
       color: '#1f2937',
@@ -500,10 +500,9 @@ export default function App() {
       transition: 'opacity 0.2s',
     }),
     sectionTitle: {
-      fontFamily: "'Playfair Display', serif",
-      fontSize: '18px',
+      fontSize: '17px',
       color: '#92400e',
-      fontWeight: 700,
+      fontWeight: 800,
       marginBottom: '14px',
     },
     assessBox: {
@@ -562,6 +561,7 @@ export default function App() {
                 style={styles.textarea}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
+                onInput={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
                 placeholder='np. "owsianka z mlekiem i bananem, zjedzone prawie wszystko"'
                 onKeyDown={e => e.key === 'Enter' && e.ctrlKey && addMeal()}
               />
@@ -702,7 +702,7 @@ export default function App() {
                 .sort(([a], [b]) => b.localeCompare(a))
                 .map(([date, val]) => (
                   <div key={date} style={{ marginBottom: '20px' }}>
-                    <div style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, color: '#92400e', marginBottom: '8px', fontSize: '16px' }}>
+                    <div style={{ fontWeight: 800, color: '#92400e', marginBottom: '8px', fontSize: '15px' }}>
                       📅 {date}
                     </div>
                     {(val.meals || []).map(meal => (
