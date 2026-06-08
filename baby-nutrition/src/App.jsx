@@ -19,6 +19,15 @@ function weekKey() {
   return `week-${d.toISOString().slice(0, 10)}`
 }
 
+function stripMarkdown(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/^#{1,3}\s*/gm, '')
+    .replace(/^[-*]\s/gm, '• ')
+    .trim()
+}
+
 function loadStorage() {
   try {
     return JSON.parse(localStorage.getItem('baby-nutrition-data') || '{}')
@@ -50,7 +59,6 @@ function rowsToData(rows) {
 function NutrientsDisplay({ n }) {
   if (!n) return <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af' }}>⏳ Analizowanie...</div>
 
-  // New qualitative format
   if (n.ocena) {
     return (
       <div style={{ marginTop: '10px' }}>
@@ -76,7 +84,6 @@ function NutrientsDisplay({ n }) {
     )
   }
 
-  // Legacy numeric format (backward compat)
   return (
     <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
       {[
@@ -236,6 +243,9 @@ export default function App() {
     () => (!SUPABASE_ENABLED ? localStorage.getItem(`baby-nutrition-day-${todayKey()}`) : '') || ''
   )
   const [weekAssessment, setWeekAssessment] = useState('')
+  const [context, setContext] = useState('')
+  const [contextInput, setContextInput] = useState('')
+  const [contextSaving, setContextSaving] = useState(false)
 
   useEffect(() => { saveStorage(data) }, [data])
 
@@ -244,16 +254,21 @@ export default function App() {
       if (!SUPABASE_ENABLED) return
       setSyncStatus('syncing')
       try {
-        const [rows, dayText, weekText] = await Promise.all([
+        const [rows, dayText, weekText, contextText] = await Promise.all([
           fetchAllMeals(),
           fetchAssessment(`day-${todayKey()}`),
           fetchAssessment(weekKey()),
+          fetchAssessment('context'),
         ])
         const remote = rowsToData(rows)
         setData(remote)
         saveStorage(remote)
         if (dayText) setDayAssessment(dayText)
         if (weekText) setWeekAssessment(weekText)
+        if (contextText !== undefined) {
+          setContext(contextText)
+          setContextInput(contextText)
+        }
         setSyncStatus('idle')
       } catch {
         setSyncStatus('error')
@@ -288,7 +303,7 @@ export default function App() {
       try { await dbInsert(meal, today) } catch {}
     }
     try {
-      const nutrients = await analyzeMeal(meal.description, meal.type)
+      const nutrients = await analyzeMeal(meal.description, meal.type, context)
       setData(prev => ({
         ...prev,
         [today]: {
@@ -328,7 +343,7 @@ export default function App() {
       try { await dbUpdate(id, { description: newDescription, meal_type: newType, nutrients: null }) } catch {}
     }
     try {
-      const nutrients = await analyzeMeal(newDescription, newType)
+      const nutrients = await analyzeMeal(newDescription, newType, context)
       setData(prev => ({
         ...prev,
         [dateKey]: {
@@ -346,7 +361,7 @@ export default function App() {
   async function handleAssessDay() {
     setAssessLoading(true)
     try {
-      const text = await assessDay(todayMeals, today)
+      const text = await assessDay(todayMeals, today, context)
       setDayAssessment(text)
       if (SUPABASE_ENABLED) {
         saveAssessment(`day-${today}`, text).catch(() => {})
@@ -358,6 +373,18 @@ export default function App() {
     }
   }
 
+  async function handleSaveContext() {
+    setContextSaving(true)
+    try {
+      setContext(contextInput)
+      if (SUPABASE_ENABLED) {
+        await saveAssessment('context', contextInput)
+      }
+    } finally {
+      setContextSaving(false)
+    }
+  }
+
   async function handleAssessWeek() {
     setAssessLoading(true)
     try {
@@ -365,7 +392,7 @@ export default function App() {
         .sort(([a], [b]) => b.localeCompare(a))
         .slice(0, 7)
         .map(([date, val]) => ({ date, meals: val.meals || [] }))
-      const text = await assessWeek(days)
+      const text = await assessWeek(days, context)
       setWeekAssessment(text)
       if (SUPABASE_ENABLED) {
         saveAssessment(weekKey(), text).catch(() => {})
@@ -516,14 +543,13 @@ export default function App() {
       </div>
 
       <div style={styles.tabs}>
-        {[['today', '📅 Dziś'], ['week', '📊 Tydzień'], ['history', '📚 Historia']].map(([id, label]) => (
+        {[['today', '📅 Dziś'], ['week', '📊 Tydzień'], ['history', '📚 Historia'], ['settings', '⚙️']].map(([id, label]) => (
           <button key={id} style={styles.tab(tab === id)} onClick={() => setTab(id)}>{label}</button>
         ))}
       </div>
 
       <div style={styles.container}>
 
-        {/* ─── TAB: DZIŚ ─── */}
         {tab === 'today' && (
           <>
             <div style={styles.card}>
@@ -582,14 +608,13 @@ export default function App() {
                   >
                     {assessLoading ? '⏳ Oceniam...' : '🩺 Oceń całodniową dietę'}
                   </button>
-                  {dayAssessment && <div style={styles.assessBox}>{dayAssessment}</div>}
+                  {dayAssessment && <div style={styles.assessBox}>{stripMarkdown(dayAssessment)}</div>}
                 </>
               )}
             </div>
           </>
         )}
 
-        {/* ─── TAB: TYDZIEŃ ─── */}
         {tab === 'week' && (
           <div style={styles.card}>
             <div style={styles.sectionTitle}>Podsumowanie tygodnia</div>
@@ -628,13 +653,39 @@ export default function App() {
                 >
                   {assessLoading ? '⏳ Analizuję...' : '📊 Podsumowanie tygodniowe AI'}
                 </button>
-                {weekAssessment && <div style={styles.assessBox}>{weekAssessment}</div>}
+                {weekAssessment && <div style={styles.assessBox}>{stripMarkdown(weekAssessment)}</div>}
               </>
             )}
           </div>
         )}
 
-        {/* ─── TAB: HISTORIA ─── */}
+        {tab === 'settings' && (
+          <div style={styles.card}>
+            <div style={styles.sectionTitle}>💊 Kontekst dla AI</div>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 14px', lineHeight: 1.6 }}>
+              Wpisz informacje o dzieciach — suplementy, alergie, preferencje. AI uwzględni je w każdej analizie posiłków i ocenach dnia.
+            </p>
+            <textarea
+              style={{ ...styles.textarea, minHeight: '100px' }}
+              value={contextInput}
+              onChange={e => setContextInput(e.target.value)}
+              placeholder='np. "dziewczynki suplementują witaminę D 600 IU/dzień, nie jedzą ryb"'
+            />
+            <button
+              style={styles.btn('#f97316', contextSaving || contextInput === context)}
+              onClick={handleSaveContext}
+              disabled={contextSaving || contextInput === context}
+            >
+              {contextSaving ? '⏳ Zapisuję...' : '💾 Zapisz'}
+            </button>
+            {context && (
+              <div style={{ marginTop: '14px', fontSize: '13px', color: '#059669', fontWeight: 600 }}>
+                ✓ Kontekst aktywny
+              </div>
+            )}
+          </div>
+        )}
+
         {tab === 'history' && (
           <div style={styles.card}>
             <div style={styles.sectionTitle}>Historia posiłków</div>
